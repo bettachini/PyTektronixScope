@@ -1,11 +1,37 @@
-from time import *
 import numbers
+import os
 import numpy as np
+import time
 
-try:
-    import visa
-except ImportError:
-    visa = None
+class usbtmc:
+    """Simple implementation of a USBTMC device driver, in the style of visa.h"""
+
+    def __init__(self, device):
+        self.device = device
+        self.FILE = os.open(device, os.O_RDWR)
+
+        # TODO: Test that the file opened
+
+    def write(self, command):
+        # os.write(self.FILE, command)
+        os.write(self.FILE, command.encode('utf-8')) # turns str into bytes literal, a sequence of octets (ints 0 to 255)
+
+    def read(self, length = 4000):
+        return os.read(self.FILE, length)
+        # return ((os.read(self.FILE, length)).decode()).rstrip('\n')
+
+    def ask(self, command):
+        self.write(command)
+        return self.read()
+
+    def getName(self):
+        self.write("*IDN?")
+        return self.read(300).decode().rstrip('\n')
+        # return self.ask('*IDN?')
+
+    def sendReset(self):
+        self.write("*RST")
+
 
 class TektronixScopeError(Exception):
     """Exception raised from the TektronixScope class
@@ -22,24 +48,30 @@ class TektronixScopeError(Exception):
 
 
 
-class TektronixScope(object):
-    """Drive a TektronixScope instrument
+class TektronixScope(usbtmc):
+    """Class to control aTektronix Osciloscope
+    def __init__(self, device='/dev/usbtmc0'):
+        self.meas = usbtmc(device)
+        self.name = self.meas.getName()
+        # [self.dataCount, self.dataOffset] = self.ptsAcq()
+        [self.dataCount, self.dataOffset] = [2500,6]
+        print(self.name)
 
     usage:
         scope = TektronixScope(instrument_resource_name)
         X,Y = scope.read_data_one_channel('CH2', t0 = 0, DeltaT = 1E-6, 
                                                             x_axis_out=True)
 
-    Only a few functions are available, and the scope should
-    be configured manually. Direct acces to the instrument can
-    be made as any Visa Instrument :  scope.ask('*IDN?')
+    Only a few functions are available.
+
+    Direct acces to the instrument can
+    be made as with a Visa Instrument :  scope.ask('*IDN?')
     """    
     def __init__(self, inst):
         """ Initialise the Scope
 
         argument : 
             inst : should be a string or an object with write and ask method
-
         """
         if not hasattr(inst, 'write'): 
             if isinstance(inst, str):
@@ -66,7 +98,7 @@ class TektronixScope(object):
 
 
 ###################################
-## Method ordered by groups 
+## Methods ordered by groups 
 ###################################
 
 #Acquisition Command Group 

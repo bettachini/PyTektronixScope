@@ -1,7 +1,7 @@
 Overview
 ========
 
-This package can be used to record data from a Tektronix scope. 
+This package can be used to control a Tektronix osciloscope, and record data from it. 
 
 
 Installation
@@ -31,5 +31,3 @@ Version history
 Main changes:
 
 * 0.1 Initial relase
-* 0.2 Update to new version of visa
-
