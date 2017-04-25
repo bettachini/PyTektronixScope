@@ -50,12 +50,6 @@ class TektronixScopeError(Exception):
 
 class TektronixScope(usbtmc):
     """Class to control aTektronix Osciloscope
-    def __init__(self, device='/dev/usbtmc0'):
-        self.meas = usbtmc(device)
-        self.name = self.meas.getName()
-        # [self.dataCount, self.dataOffset] = self.ptsAcq()
-        [self.dataCount, self.dataOffset] = [2500,6]
-        print(self.name)
 
     usage:
         scope = TektronixScope(instrument_resource_name)
@@ -63,26 +57,20 @@ class TektronixScope(usbtmc):
                                                             x_axis_out=True)
 
     Only a few functions are available.
-
-    Direct acces to the instrument can
-    be made as with a Visa Instrument :  scope.ask('*IDN?')
+    Direct acces to the instrument can be made as with a Visa Instrument:
+        scope.ask('*IDN?')
     """    
-    def __init__(self, inst):
-        """ Initialise the Scope
 
+    def __init__(self, device='/dev/usbtmc0'):
+        """ Initialise the Scope
         argument : 
             inst : should be a string or an object with write and ask method
         """
-        if not hasattr(inst, 'write'): 
-            if isinstance(inst, str):
-                if visa is not None:
-                    rm = visa.ResourceManager()
-                    inst = rm.open_resource(inst)
-                else:
-                    raise Exception('Visa is not install on your system')
-            else:
-                raise ValueError('First argument should be a string or an instrument')
-        self._inst = inst
+        self.meas = usbtmc(device)
+        self.name = self.meas.getName()
+        # [self.dataCount, self.dataOffset] = self.ptsAcq()
+        [self.dataCount, self.dataOffset] = [2500,6]
+        print(self.name)
 
     def write(self, cmd):
         return self._inst.write(cmd)
@@ -108,6 +96,10 @@ class TektronixScope(usbtmc):
     def stop_acq(self):
         """Stop acquisition"""
         self.write('ACQ:STATE STOP')
+    def single_pulse(self):
+        self.write('ACQuire:STOPAfter SEQuence')
+
+
 #Alias Command Group
 
 #Bus Command Group
@@ -115,6 +107,8 @@ class TektronixScope(usbtmc):
 #Calibration and Diagnostic Command Group
 
 #Cursor Command Group
+
+#Data Logging Commands 
 
 #Display Command Group
 
@@ -176,6 +170,16 @@ class TektronixScope(usbtmc):
 #Search Command Group
 
 #Status and Error Command Group
+    def is_busy(self):
+        ''' () -> boolean
+        
+        Returns False wheter oscilloscope finished an acquisition.
+        
+        >>> is_busy()
+        False
+        '''
+        return int(self.ask('BUSY?'))==1
+
 
 #Trigger Command Group
 
@@ -191,7 +195,7 @@ class TektronixScope(usbtmc):
         n_max = self.number_of_channel()
         channel_list = ['CH%i'%(i+1) for i in range(n_max)]
         channel_listb = ['%i'%(i+1) for i in range(n_max)]
-        if isinstance(name, numbers.Number):
+        if isinstance(name, int):
             if name > n_max:
                 raise TektronixScopeError("Request channel %i while channel \
 number should be between %i and %i"%(name, 1, n_max))
@@ -253,8 +257,33 @@ should be in %s"%(str(name), ' '.join(channel_list)))
 
 # Waveform Transfer Command Group
     def set_data_source(self, name):
+        ''' backwards compatibility use data_source function'''
         name = self.channel_name(name)
         self.write('DAT:SOUR '+str(name))
+
+#    def data_source(self, *arg):
+#        ''' () -> int$
+#        Returns channel number of waveform to transfer at request
+#        int ->$
+#        Sets channel to transfer its waveform
+#        $
+#        >>> data_source(2)$
+#        waveform to tranfer that of channel 2
+#        >>> data_source()$
+#        2
+#        '''
+#        if (len(arg)==0):
+#            return int(self.textAsk('DATa:SOURce?' ) )
+#        else:
+#            name= 'CH%i'%(arg[0] )
+#            # name= 'CH%i'%(str(arg[0] ))
+#            # name = self.channel_name(str(arg[0] ) ) # name= 'CH#' string
+#            self.write('DATa:SOURce '+ name )
+
+    def set_data_encoding(self, encoding='ASCII'):
+        """Sets data transfer format
+        """
+        self.write('DATa:ENCdg %s'%encoding)
 
     def set_data_start(self, data_start):
         """Set the first data points of the waveform record
@@ -267,6 +296,38 @@ should be in %s"%(str(name), ' '.join(channel_list)))
 
     def get_data_start(self):
         return int(self.ask('DATA:START?'))
+
+    def horizontal_main_position(self, *arg):
+        ''' () -> str
+        Returns the horizontal centre position in seconds
+        str ->
+        Sets the horizontal centre position
+        
+        >>> horizontal_main_position(1E-3)
+        horizontal centre position to 1 \mu s
+        >>> horizontal_main_position()
+        0.0E0
+        '''
+        if (len(arg)==0):
+            return self.textAsk('HORizontal:MAIn:POSition?')
+        else:
+            self.write('HORizontal:MAIn:POSition '+ str(arg[0]) )
+
+    def horizontal_main_scale(self, *arg):
+        ''' () -> str
+        Returns the horizontal scale
+        str ->
+        Sets the horizontal scale
+        
+        >>> horizontal_main_scale(1E-3)
+        horizontal scale to 1 \mu s
+        >>> horizontal_main_scale()
+        0.001
+        '''
+        if (len(arg)==0):
+            return self.textAsk('HORizontal:MAIn:SCAle?')
+        else:
+            self.write('HORizontal:MAIn:SCAle '+ str(arg[0]) )
 
     def get_horizontal_record_length(self):
         return int(self.ask("horizontal:recordlength?"))
@@ -286,18 +347,22 @@ should be in %s"%(str(name), ' '.join(channel_list)))
         return int(self.ask('DATA:STOP?'))
 
     def get_out_waveform_horizontal_sampling_interval(self):
-        return float(self.ask('WFMO:XIN?'))
+        return float(self.ask('WFMPre:XINcr?'))
+        # return float(self.ask('WFMO:XIN?'))
 
     def get_out_waveform_horizontal_zero(self):
-        return float(self.ask('WFMO:XZERO?'))
+        return float(self.ask('WFMPre:XZERO?'))
+        # return float(self.ask('WFMO:XZERO?'))
 
     def get_out_waveform_vertical_scale_factor(self):
-        return float(self.ask('WFMO:YMUlt?'))
+        return float(self.ask('WFMPre:YMUlt?'))
+        # return float(self.ask('WFMO:YMUlt?'))
 
     def get_out_waveform_vertical_position(self):
-        return float(self.ask('WFMO:YOFf?'))
+        return float(self.ask('WFMPre:YOFf?'))
+        # return float(self.ask('WFMO:YOFf?'))
 
-    def read_data_one_channel(self, channel=None, data_start=None, 
+    def read_data_one_channel(self, channel=None, data_start=None,
                               data_stop=None, x_axis_out=False,
                               t0=None, DeltaT = None, booster=False):
         """Read waveform from the specified channel
@@ -323,9 +388,9 @@ should be in %s"%(str(name), ' '.join(channel_list)))
         # are change to set booster to false. However, one cannot
         # detect if the setting of the scope are change
         # To be safe, booster is set to False by default.  
-        if booster:  
+        if booster:
             if not hasattr(self, 'first_read'): booster=False
-            else: 
+            else:
                 if self.first_read: booster=False
         self.first_read=False
         if not booster:
@@ -342,7 +407,7 @@ t0, DeltaT and data_start, data_stop args are mutually exculsive")
             if data_start is not None:
                 self.set_data_start(data_start)
             if data_stop is not None:
-                self.set_data_stop(data_stop) 
+                self.set_data_stop(data_stop)
             self.data_start = self.get_data_start()
             self.data_stop = self.get_data_stop()
         # Set the channel
