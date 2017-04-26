@@ -221,9 +221,15 @@ class TektronixScope(usbtmc):
 
 #Miscellaneous Command Group
     def load_setup(self):
-        l = self.ask('SET?')
-        dico = dict([e.split(' ') for e in l.split(';')[1:]])
-        self.dico = dico
+        l = self.textAsk('SET?')
+        # l = self.ask('SET?')
+        lok= [e.split(' ') for e in l.split(';')[1:]]
+        # dico = dict([e.split(' ') for e in l.split(';')[1:]])
+        if (len(lok[79])>2):  # line [79] can have 4 instead of 2 elements e.g. [':MATH:DEFINE', '"CH1', '-', 'CH2"']
+            aux= lok[79][1]+ lok[79][2]+ lok[79][3]
+            lok[79]= [lok[79][0], aux]
+            # print(lok)
+        self.dico = dict(lok)
 
     def get_setup_dict(self, force_load=False):
         """Return the dictionnary of the setup 
@@ -307,8 +313,41 @@ should be in %s"%(str(name), ' '.join(channel_list)))
     def get_channel_scale(self, channel):
         return float(self.ask('%s:SCA?'%self.channel_name(channel)))
 
-    def get_out_waveform_vertical_scale_factor(self):
-        return float(self.ask('%s:SCA?'%self.channel_name(channel)))
+    def get_out_waveform_vertical_scale_factor(self): % preserved for compatibility reasons
+        return get_channel_scale(self, channel_name(channel)))
+
+
+    def set_impedance(self, channel, value):
+        """Sets the input impedance of the channel"""
+        liste_string = ['FIF', 'FIFty','SEVENTYF','SEVENTYFive','MEG','50','75','1.00E+06']
+        liste_value = [50, 75, 1.00E6]
+        if isinstance(value, str) or isinstance(value, unicode):
+            if value.lower() not in map(lambda a:a.lower(),liste_string):
+                raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_string)
+        elif isinstance(value, numbers.Number):
+            if value not in liste_value:
+                raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_value)
+            else:
+                value = str(value) if value<100 else '1.00E+06'
+        else:
+            raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_string)
+        self.write("%s:IMPedance %s"%(self.channel_name(channel), value))
+    def get_impedance(self, channel):
+        """Returns the input impedance of the channel"""
+        return self.ask('%s:IMPedance?'%self.channel_name(channel))
+
+    def set_coupling(self, channel, value):
+        """Sets the input coupling of the channel"""
+        liste_string = ['AC','DC','GND']
+        if isinstance(value, str) or isinstance(value, unicode):
+            if value.lower() not in map(lambda a:a.lower(),liste_string):
+                raise TektronixScopeError("Coupling is %s. It should be in %s"%liste_string)
+        else:
+            raise TektronixScopeError("Coupling is %s. It should be in %s"%liste_string)
+        self.write("%s:COUPling %s"%(self.channel_name(channel), value))
+    def get_coupling(self, channel):
+        """Returns the input coupling of the channel"""
+        return self.ask('%s:COUPling?'%self.channel_name(channel))
 
 # Waveform Transfer Command Group
     def set_data_source(self, name):
