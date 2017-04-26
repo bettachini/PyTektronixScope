@@ -275,6 +275,57 @@ class TektronixScope(usbtmc):
 
 
 #Trigger Command Group
+    def trigger_source(self, *arg):
+        ''' () -> str
+        Returns the trigger source { CH<x> | EXT | EXT5 | EXT10 }
+        str ->
+        Sets trigger source
+        
+        >>> trigger_source('CH1')
+        trigger source set to CH1
+        >>> trigger_source()
+        CH1
+        '''
+        if (len(arg)==0):
+            return self.textAsk('TRIGger:MAIn:PULse:SOUrce?')
+        else:
+            self.write('TRIGger:MAIn:PULse:SOUrce '+arg[0])
+            # print ('trigger source set to ' +arg[0])
+
+    def trigger_slope(self, *arg):
+        ''' () -> string
+        Returns FALL or RISE 
+        string ->
+        Sets trigger slope
+        
+        >>> trigger_slope(RISE)
+        trigger slope set RISE
+        >>> trigger_slope()
+        RISE
+        '''
+        if (len(arg)==0):
+            return float(self.ask('TRIGger:MAIn:EDGE:SLOpe?') )
+        else:
+            self.write('TRIGger:MAIn:EDGE:SLOpe '+ arg[0])
+
+    def trigger_level(self, *arg):
+        ''' () -> float
+        Returns a float with the trigger level or if float given sets that trigger level to float value
+        float ->
+        Sets trigger level
+        
+        >>> trigger_level(1.2)
+        trigger set to 1.20E+00 V
+        >>> trigger_level()
+        1.2
+        '''
+        if (len(arg)==0):
+            return float(self.ask('TRIGger:MAIn:LEVel?') )
+        else:
+            self.write('TRIGger:MAIn:LEVel {:.2E}'.format(arg[0]))
+            # print ('trigger set to {:.2E} V'.format(arg[0]))
+
+
 
 #Vertical Command Group
     def channel_name(self, name):
@@ -313,8 +364,9 @@ should be in %s"%(str(name), ' '.join(channel_list)))
     def get_channel_scale(self, channel):
         return float(self.ask('%s:SCA?'%self.channel_name(channel)))
 
-    def get_out_waveform_vertical_scale_factor(self): % preserved for compatibility reasons
-        return get_channel_scale(self, channel_name(channel)))
+    def get_out_waveform_vertical_scale_factor(self):
+	# preserved for compatibility reasons
+        return get_channel_scale(self, channel_name(channel))
 
 
     def set_impedance(self, channel, value):
