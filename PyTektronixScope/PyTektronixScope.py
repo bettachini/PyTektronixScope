@@ -61,21 +61,30 @@ class TektronixScope(usbtmc):
         scope.ask('*IDN?')
     """    
 
-    def __init__(self, device='/dev/usbtmc0'):
+    def __init__(self, inst='/dev/usbtmc0'):
         """ Initialise the Scope
         argument : 
-            inst : should be a string or an object with write and ask method
+            device : should be a string or an object with write and ask method
         """
-        self.meas = usbtmc(device)
-        self.name = self.meas.getName()
+        if not hasattr(inst, 'write'):
+            if not isinstance(inst, str):
+                raise ValueError('First argument should be a string or an instrument')
+        self._inst = usbtmc(inst)
+        self.name = self._inst.getName()
         # [self.dataCount, self.dataOffset] = self.ptsAcq()
         [self.dataCount, self.dataOffset] = [2500,6]
         print(self.name)
 
     def write(self, cmd):
-        return self._inst.write(cmd)
+        """Send an arbitrary command directly to the scope"""
+        self._inst.write(cmd)
+
+    def read(self, command):
+        """Read an arbitrary amount of data directly from the scope"""
+        return self._inst.read(command)
 
     def ask(self, cmd):
+        """Write + Read"""
         return self._inst.ask(cmd)
 
     def ask_raw(self, cmd):
@@ -84,8 +93,86 @@ class TektronixScope(usbtmc):
         else:
             return self._inst.ask(cmd)
 
+    def textAsk(self, command):
+        return (self._inst.ask(command) ).decode().rstrip('\n')
 
-###################################
+    def reset(self):
+        """Reset the instrument"""
+        self.meas.sendReset()
+
+    def readBuff2(self):
+        try:
+            return self.ask('CURVE?')
+        except TimeoutError:
+            print('Probably requested channel has no data')
+            raise
+
+    def ptsAcq(self):	# ran once in order to obtain buffer parametres
+        buff2 = self.readBuff2()	# read single buffer
+        dataPointsCharacters= int(buff2[1:2])
+        dataOffset= 2+ dataPointsCharacters
+        return (int(buff2[2:2+ dataPointsCharacters])), dataOffset # number acquired points per buffer read, data bits offset in buffer
+
+    def singleAcq(self,waitTime=1E-3):
+        self.start_acq()
+        while(self.is_busy()):
+            time.sleep(waitTime)
+        # return (np.frombuffer(readBuff2(test), dtype = np.dtype('int8').newbyteorder('<'), count= dataCount, offset= dataOffset) )  
+        buff2 = self.readBuff2()	# reads single buffer 
+        return ( np.frombuffer(buff2, dtype = np.dtype('int8').newbyteorder('<'), count= self.dataCount, offset= self.dataOffset) )	
+
+    def ascii_read(self):
+        """
+        Reads channel waveform as ASCII but fails to read the whole 2500 available positions
+        """
+        self.set_data_encoding('ASCII')
+        buff1 = self.ask('CURVE?')
+        res1= np.asarray(buff1.split(','))
+        # The output of CURVE? is scaled to the display of the scope
+        self.offset = self.get_out_waveform_vertical_position()
+        self.scale = self.get_out_waveform_vertical_scale_factor()
+        # The following converts the data to the right scale
+        Y = (res1 - self.offset)*self.scale
+        return Y
+
+    def bin_read(self):
+        """
+        Reads channel waveform as RIBinary
+        """
+        # self.set_data_encoding('RIBinary')
+        try:
+            buff2 = self.ask('CURVE?')
+        except TimeoutError:
+            print('Probably requested channel has no data')
+            raise
+        dataPointsCharacters= int(buff2[1:2])
+        dataOffset= 2+ dataPointsCharacters
+        dataCount= int(buff2[2:2+ dataPointsCharacters])
+        res2 = np.frombuffer(buff2, dtype = np.dtype('int8').newbyteorder('<'), count= dataCount, offset= dataOffset)
+        # The output of CURVE? is scaled to the display of the scope
+        self.offset = self.get_out_waveform_vertical_position()
+        self.scale = self.get_out_waveform_vertical_scale_factor()
+        # The following converts the data to the right scale
+        Y = (res2 - self.offset)*self.scale
+        return Y
+
+
+    def temps(self):
+        xincr= self.get_out_waveform_horizontal_sampling_interval()
+        xzero= self.get_out_waveform_horizontal_zero()
+        lesTemps= xzero+ np.arange(2500)* xincr
+        return lesTemps
+
+    def Xaxis(self):
+        self.x_0 = self.get_out_waveform_horizontal_zero()
+        self.data_start = self.get_data_start()
+        self.data_stop = self.get_data_stop()
+        self.delta_x = self.get_out_waveform_horizontal_sampling_interval()
+        X_axis = self.x_0 + np.arange(self.data_start-1, self.data_stop)*self.delta_x
+        return X_axis
+
+
+##################################
 ## Methods ordered by groups 
 ###################################
 
@@ -217,43 +304,11 @@ should be in %s"%(str(name), ' '.join(channel_list)))
     def get_channel_position(self, channel):
         return float(self.ask('%s:POS?'%self.channel_name(channel)))
 
-    def get_out_waveform_vertical_scale_factor(self):
+    def get_channel_scale(self, channel):
         return float(self.ask('%s:SCA?'%self.channel_name(channel)))
 
-
-    def set_impedance(self, channel, value):
-        """Sets the input impedance of the channel"""
-        liste_string = ['FIF', 'FIFty','SEVENTYF','SEVENTYFive','MEG','50','75','1.00E+06']
-        liste_value = [50, 75, 1.00E6]
-        if isinstance(value, str) or isinstance(value, unicode):
-            if value.lower() not in map(lambda a:a.lower(),liste_string):
-                raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_string)
-        elif isinstance(value, numbers.Number):
-            if value not in liste_value:
-                raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_value)
-            else:
-                value = str(value) if value<100 else '1.00E+06'
-        else:
-            raise TektronixScopeError("Impedance is %s. It should be in %s"%liste_string)
-        self.write("%s:IMPedance %s"%(self.channel_name(channel), value))
-    def get_impedance(self, channel):
-        """Returns the input impedance of the channel"""
-        return self.ask('%s:IMPedance?'%self.channel_name(channel))
-
-    def set_coupling(self, channel, value):
-        """Sets the input coupling of the channel"""
-        liste_string = ['AC','DC','GND']
-        if isinstance(value, str) or isinstance(value, unicode):
-            if value.lower() not in map(lambda a:a.lower(),liste_string):
-                raise TektronixScopeError("Coupling is %s. It should be in %s"%liste_string)
-        else:
-            raise TektronixScopeError("Coupling is %s. It should be in %s"%liste_string)
-        self.write("%s:COUPling %s"%(self.channel_name(channel), value))
-    def get_coupling(self, channel):
-        """Returns the input coupling of the channel"""
-        return self.ask('%s:COUPling?'%self.channel_name(channel))
-
-
+    def get_out_waveform_vertical_scale_factor(self):
+        return float(self.ask('%s:SCA?'%self.channel_name(channel)))
 
 # Waveform Transfer Command Group
     def set_data_source(self, name):
@@ -347,6 +402,10 @@ should be in %s"%(str(name), ' '.join(channel_list)))
         return int(self.ask('DATA:STOP?'))
 
     def get_out_waveform_horizontal_sampling_interval(self):
+        '''
+        Beware: Different siries of scopes have slight variations of syntax for WFMO (or WFMPRE)
+        See https://forum.tek.com/viewtopic.php?f=568&t=137478
+        '''
         return float(self.ask('WFMPre:XINcr?'))
         # return float(self.ask('WFMO:XIN?'))
 
