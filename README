@@ -16,7 +16,7 @@ To install pyTekRealTimeUSBTMC, download the package and run the command::
 
 Alternatively the pyTektronixScope directory can manually be moved to a location that Python can import from.
 
-Sources can also be download on the `pyTektronixScopeUSBTMC github repository`_. 
+Sources can also be download on the `pyTektronixScopeUSBTMC github repository`. 
 
 Usage
 =====
@@ -28,17 +28,9 @@ Typical usage::
 
   X,Y = scope.read_data_one_channel('CH2', t0 = 0, DeltaT = 1E-6, x_axis_out=True)
 
-Contact
-=======
-
-Please send bug reports or feedback to `Victor Bettachini`_.
-
 
 Version history
 ===============
 Main changes:
 
 * 0.1 Initial relase
-
-.. _Victor Bettachini: mailto:victorb@gmx.net
-.. _PyTektronixScopeUSBTMC github repository: https://github.com/bettachini/PyTektronixScope
