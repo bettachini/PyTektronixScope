@@ -10,18 +10,26 @@ The package is an adaptation of PyTektronixScope by Pierre Cladé based on VISA.
 Installation
 ============
 
-To install pyTekRealTimeUSBTMC, download the package and run the command:: 
+To use the USBTMC device driver GNU/Linux in Debian its permissions should be set at `/lib/udev/rules.d/40-usbtmc-permissions.rules` to
 
+  # Devices
+  KERNEL=="usbtmc/*",
+  KERNEL=="usbtmc[0-9]*",
+  MODE="0660", GROUP="usbtmc"
+  MODE="0660", GROUP="usbtmc"
+
+A replace-in permissions file is provided.
+
+To install pyTekRealTimeUSBTMC, download the package and run the command:: 
   python setup.py install
 
 Alternatively the pyTektronixScope directory can manually be moved to a location that Python can import from.
 
 Sources can also be download on the `pyTektronixScopeUSBTMC github repository`. 
 
+
 Usage
 =====
-
-Typical usage::
 
   from pyTekScopeUSBTMC import TektronixScopeUSBTMC
   scope = TektronixScopeUSBTMC("/dev/usbtmc0")
