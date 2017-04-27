@@ -47,7 +47,6 @@ class TektronixScopeError(Exception):
         return self.mesg
 
 
-
 class TektronixScope(usbtmc):
     """Class to control aTektronix Osciloscope
 
@@ -156,7 +155,6 @@ class TektronixScope(usbtmc):
         Y = (res2 - self.offset)*self.scale
         return Y
 
-
     def temps(self):
         xincr= self.get_out_waveform_horizontal_sampling_interval()
         xzero= self.get_out_waveform_horizontal_zero()
@@ -224,12 +222,12 @@ class TektronixScope(usbtmc):
         l = self.textAsk('SET?')
         # l = self.ask('SET?')
         lok= [e.split(' ') for e in l.split(';')[1:]]
-        # dico = dict([e.split(' ') for e in l.split(';')[1:]])
         if (len(lok[79])>2):  # line [79] can have 4 instead of 2 elements e.g. [':MATH:DEFINE', '"CH1', '-', 'CH2"']
             aux= lok[79][1]+ lok[79][2]+ lok[79][3]
             lok[79]= [lok[79][0], aux]
-            # print(lok)
         self.dico = dict(lok)
+#        dico = dict([e.split(' ') for e in l.split(';')[1:]])
+#        self.dico = dico
 
     def get_setup_dict(self, force_load=False):
         """Return the dictionnary of the setup 
@@ -257,6 +255,7 @@ class TektronixScope(usbtmc):
             return 4
         else:
             return 2
+
 
 #Save and Recall Command Group
 
@@ -324,7 +323,6 @@ class TektronixScope(usbtmc):
         else:
             self.write('TRIGger:MAIn:LEVel {:.2E}'.format(arg[0]))
             # print ('trigger set to {:.2E} V'.format(arg[0]))
-
 
 
 #Vertical Command Group
@@ -400,6 +398,7 @@ should be in %s"%(str(name), ' '.join(channel_list)))
     def get_coupling(self, channel):
         """Returns the input coupling of the channel"""
         return self.ask('%s:COUPling?'%self.channel_name(channel))
+
 
 # Waveform Transfer Command Group
     def set_data_source(self, name):
@@ -566,7 +565,7 @@ t0, DeltaT and data_start, data_stop args are mutually exculsive")
         if not booster:
             if not self.is_channel_selected(channel):
                 raise TektronixScopeError("Try to read channel %s which \
-is not selectecd"%(str(name)))
+is not selectecd"%(str(channel)))
         if not booster:
             self.write("DATA:ENCDG RIB")
             self.write("WFMO:BYTE_NR 2")
@@ -587,6 +586,7 @@ is not selectecd"%(str(name)))
             return X_axis, Y
         else:
             return Y
+
 
 #Zoom Command Group
 
