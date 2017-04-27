@@ -47,7 +47,7 @@ class TektronixScopeError(Exception):
         return self.mesg
 
 
-class TektronixScope(usbtmc):
+class TektronixScopeUSBTMC(usbtmc):
     """Class to control aTektronix Osciloscope
 
     usage:
@@ -351,7 +351,7 @@ number should be between %i and %i"%(name, 1, n_max))
 should be in %s"%(str(name), ' '.join(channel_list)))
 
     def is_channel_selected(self, channel):
-        return self.ask('SEL:%s?'%(self.channel_name(channel)))=='1'
+        return bool(int(self.textAsk('SEL:%s?'%(self.channel_name(channel) ) ) ))
 
     def get_channel_offset(self, channel):
         return float(self.ask('%s:OFFS?'%self.channel_name(channel)))
@@ -365,7 +365,6 @@ should be in %s"%(str(name), ' '.join(channel_list)))
     def get_out_waveform_vertical_scale_factor(self):
 	# preserved for compatibility reasons
         return get_channel_scale(self, channel_name(channel))
-
 
     def set_impedance(self, channel, value):
         """Sets the input impedance of the channel"""
@@ -511,6 +510,23 @@ should be in %s"%(str(name), ' '.join(channel_list)))
         return float(self.ask('WFMPre:YOFf?'))
         # return float(self.ask('WFMO:YOFf?'))
 
+    def data_width(self, *arg):
+        ''' () -> string
+        Returns data width: 1 or 2 (bytes)
+        string ->
+        Sets data width: 1 or 2 bytes
+        
+        >>> data_width(1)
+        <data width set to 1>
+        >>> data_width()
+        1
+        '''
+        if (len(arg)==0):
+            return int(self.ask('DATa:WIDth?') )
+        else:
+            self.write('DATa:WIDth '+ str(arg[0] ) )
+        return
+
     def read_data_one_channel(self, channel=None, data_start=None,
                               data_stop=None, x_axis_out=False,
                               t0=None, DeltaT = None, booster=False):
@@ -577,8 +593,9 @@ is not selectecd"%(str(channel)))
         X_axis = self.x_0 + np.arange(self.data_start-1, self.data_stop)*self.delta_x
 
         buffer = self.ask_raw('CURVE?')
-        res = np.frombuffer(buffer, dtype = np.dtype('int16').newbyteorder('>'),
-                            offset=int(buffer[1])+2)
+        # Single byte (int8) DATa:WIDth mode for shorter transfer
+        res = np.frombuffer(buffer, dtype = np.dtype('int8').newbyteorder('<'), count= self.dataCount, offset= self.dataOffset)
+        # res = np.frombuffer(buffer, dtype = np.dtype('int16').newbyteorder('>'), offset=int(buffer[1])+2)
         # The output of CURVE? is scaled to the display of the scope
         # The following converts the data to the right scale
         Y = (res - self.offset)*self.scale

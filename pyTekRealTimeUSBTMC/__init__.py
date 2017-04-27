@@ -1,0 +1,1 @@
+from pyTekScopeUSBTMC import *
