@@ -1,0 +1,36 @@
+#
+# udev permissions for USB TMC devices
+#
+
+#
+# The generic way for identifying USB TMC devices would be by first checking
+# that bDeviceClass is either 0 (as presribed by USB TMC) or 0xff (as
+# implemented by Rigol) and that bDeviceSubClass and bDeviceProtocol are both
+# 0xff, and then diving into the interface descriptors and identifying that
+# there is one with bInterfaceClass 0xfe (application specific) and
+# bInterfaceSubClass 0x03 (USB TMC).
+#
+# Unfortunately, udev's mechanism of finding this information via usb_id
+# (which, oddly enough, seems to be a bit redundant since udev can also see
+# the interface itself in some cases), appears to be broken.
+#
+# We thus fall back to using a list of vendor/product IDs for now :-(
+#
+
+#SUBSYSTEM=="usb_device", GOTO="usb_tmc_start"
+#SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", GOTO="usb_tmc_start"
+#GOTO="usb_tmc_end"
+#
+#LABEL="usb_tmc_start"
+#
+## Tektronix TDS2002B oscilloscope <VAB 150420>
+#ATTRS{idVendor}=="0699", ATTRS{idProduct}=="0346", MODE="0660", GROUP="dialout"
+#
+#LABEL="usb_tmc_end"
+
+
+# à la https://www.raspberrypi.org/forums/viewtopic.php?t=60784&p=485926
+# Devices
+KERNEL=="usbtmc/*", MODE="0660", GROUP="dialout"
+KERNEL=="usbtmc[0-9]*", MODE="0660", GROUP="dialout"
+
